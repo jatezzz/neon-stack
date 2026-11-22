@@ -9,7 +9,7 @@ JavaScript, CSS y HTML puros: sin frameworks, sin paso de compilación, sin regi
 *English: a one-tap stacking game with one tower of the day, the same for everyone. Open-source browser game in plain
 JavaScript. Add `?lang=en` for English.*
 
-![Neon Stack](og.png)
+![Neon Stack](og.jpg)
 
 ## Cómo se juega
 
