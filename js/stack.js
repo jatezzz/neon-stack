@@ -19,6 +19,12 @@
     var GROW = 10;               // px a block grows back on a perfect streak of four or more
 
     var I = window.NeonI18n, D = window.NeonDaily;
+
+    //  The stage from the game's cover (img/bg.jpg): night sky, sun and mountains, the grid floor the tower stands on.
+    //  It scrolls at a quarter of the tower's speed, so climbing has depth. The plain gradient shows until it loads.
+    var BACKDROP = new Image(), backdropReady = false;
+    BACKDROP.onload = function () { backdropReady = true; };
+    BACKDROP.src = 'img/bg.jpg?v=1';
     function t(key, vars) { return I ? I.t(key, vars) : key; }
     function num(n) { return I ? I.number(n) : String(n); }
     function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -45,7 +51,9 @@
         }
         return { hue: hue, floors: floors };
     }
-    function floorColor(plan, n) { return 'hsl(' + ((plan.hue + n * 11) % 360) + ', 100%, 62%)'; }
+    //  Floors walk through the universe's palette, one colour per floor like the cover; yellow is for golden blocks.
+    var TOWER = ['#00f0ff', '#ff00c8', '#00ff9c', '#b14dff', '#3d8bff', '#ff4fa3'];
+    function floorColor(plan, n) { return TOWER[(Math.floor(plan.hue / 60) + n) % TOWER.length]; }
 
     // ------------------------------------------------------------------------------------- sound
 
@@ -173,6 +181,7 @@
         this.log('drop', { floor: this.floors, perfect: perfect, streak: this.perfectStreak, w: Math.round(placed.w), golden: b.golden, points: points });
         //  Feel: a small shake, a pitch that climbs with a perfect streak, a burst on perfect drops.
         var y = this.screenY(this.floors) + BH / 2;
+        this.burst(placed.x + placed.w / 2, y - BH / 2, '#ffdc3c', perfect ? 10 : 6);      // landing sparks, every drop
         if (perfect) {
             this.burst(placed.x + placed.w / 2, y, b.color, 14);
             this.texts.push({ x: W / 2, y: y - 30, text: t('wall.clear') + (this.perfectStreak > 1 ? ' ×' + this.perfectStreak : ''), life: 0.8, max: 0.8, color: '#ffffff' });
@@ -350,15 +359,22 @@
         ctx.closePath();
     }
 
+    //  A glass cube, like the cover: two faces split by a bright vertical edge, light from above, glowing rims.
     function drawBlock(ctx, x, y, w, color, glow, golden) {
         ctx.save();
         if (glow) { ctx.shadowColor = color; ctx.shadowBlur = glow; }
-        ctx.fillStyle = color;
-        roundRect(ctx, x, y + 1, w, BH - 2, 4); ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 4, y + 3, Math.max(0, w - 8), 3);
-        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x + 2, y + BH - 7, Math.max(0, w - 4), 4);
-        if (golden) { ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; roundRect(ctx, x + 2, y + 3, w - 4, BH - 6, 3); ctx.stroke(); }
+        ctx.fillStyle = color; ctx.globalAlpha = 0.9;
+        roundRect(ctx, x, y + 1, w, BH - 2, 3); ctx.fill();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        var gl = ctx.createLinearGradient(0, y, 0, y + BH);
+        gl.addColorStop(0, 'rgba(255,255,255,0.45)'); gl.addColorStop(0.5, 'rgba(255,255,255,0.05)'); gl.addColorStop(1, 'rgba(0,0,0,0.3)');
+        ctx.fillStyle = gl; roundRect(ctx, x, y + 1, w, BH - 2, 3); ctx.fill();
+        if (w > 16) {
+            ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.fillRect(x + 1, y + 2, w / 2 - 1, BH - 4);            // the left face, in shade
+            ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(x + w / 2 - 0.75, y + 2, 1.5, BH - 4);  // the front edge
+        }
+        ctx.strokeStyle = golden ? '#ffffff' : 'rgba(255,255,255,0.7)'; ctx.lineWidth = golden ? 2 : 1.2;
+        roundRect(ctx, x + 0.6, y + 1.6, w - 1.2, BH - 3.2, 3); ctx.stroke();
         ctx.restore();
     }
 
@@ -367,14 +383,27 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
-        //  Background: deep blue that warms up as the tower grows, with a faint grid.
-        var g = ctx.createLinearGradient(0, 0, 0, H), heat = Math.min(this.floors / 60, 1);
-        g.addColorStop(0, 'hsl(' + (235 - heat * 40) + ', 60%, ' + (4 + heat * 6) + '%)'); g.addColorStop(1, '#140a2a');
-        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-        ctx.strokeStyle = 'rgba(177,77,255,0.10)'; ctx.lineWidth = 1;
-        var off = this.cam % 40;
-        for (var gx = 0; gx <= W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, TOP); ctx.lineTo(gx, H); ctx.stroke(); }
-        for (var gy = TOP + off; gy <= H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+        //  Background: the cover's stage, scrolling slowly as the tower grows; the old gradient until it loads.
+        if (backdropReady) {
+            var bs = Math.max(W / BACKDROP.width, H / BACKDROP.height), bw = BACKDROP.width * bs, bh = BACKDROP.height * bs;
+            var by = (H - bh) / 2 + this.cam * 0.25;
+            ctx.fillStyle = '#05060f'; ctx.fillRect(0, 0, W, H);
+            ctx.drawImage(BACKDROP, (W - bw) / 2, by, bw, bh);
+            if (by > 0) {                       // above the picture: the sky keeps going, dark
+                var sky = ctx.createLinearGradient(0, by - 40, 0, by + 30);
+                sky.addColorStop(0, 'rgba(5,6,15,1)'); sky.addColorStop(1, 'rgba(5,6,15,0)');
+                ctx.fillStyle = sky; ctx.fillRect(0, 0, W, by + 30);
+            }
+            ctx.fillStyle = 'rgba(5,6,15,0.3)'; ctx.fillRect(0, 0, W, H);
+        } else {
+            var g = ctx.createLinearGradient(0, 0, 0, H), heat = Math.min(this.floors / 60, 1);
+            g.addColorStop(0, 'hsl(' + (235 - heat * 40) + ', 60%, ' + (4 + heat * 6) + '%)'); g.addColorStop(1, '#140a2a');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = 'rgba(177,77,255,0.10)'; ctx.lineWidth = 1;
+            var off = this.cam % 40;
+            for (var gx = 0; gx <= W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, TOP); ctx.lineTo(gx, H); ctx.stroke(); }
+            for (var gy = TOP + off; gy <= H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+        }
 
         ctx.save();
         if (this.fx.shake > 0 && !this.paused) { ctx.translate((Math.random() - 0.5) * this.fx.mag * 2, (Math.random() - 0.5) * this.fx.mag * 2); }
@@ -425,7 +454,10 @@
 
         for (i = 0; i < this.particles.length; i++) {
             var q = this.particles[i];
-            ctx.globalAlpha = Math.max(0, Math.min(1, q.life * 2)); ctx.fillStyle = q.color; ctx.fillRect(q.x - 2, q.y - 2, 4, 4);
+            //  Sparks: short streaks along their motion, like the cover's landing sparks.
+            ctx.globalAlpha = Math.max(0, Math.min(1, q.life * 2)); ctx.strokeStyle = q.color; ctx.lineWidth = 2;
+            var sp = Math.sqrt(q.vx * q.vx + q.vy * q.vy) || 1;
+            ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx / sp * 7, q.y - q.vy / sp * 7); ctx.stroke();
         }
         ctx.globalAlpha = 1;
         for (i = 0; i < this.texts.length; i++) {
