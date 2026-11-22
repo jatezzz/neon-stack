@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+        <meta name="theme-color" content="#05060f">
+        <title>Neon Stack: reto diario</title>
+        <meta name="description" content="Una torre nueva cada día, igual para todos. Apila bloques con un toque, gratis en el navegador, sin registro, y comparte tu resultado.">
+        <!-- Every copy of the game points to the portal as the one address to share and to index. -->
+        <link rel="canonical" href="https://games.johnandrestrujillo.com/play/neon-stack">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="OpenArcade">
+        <meta property="og:locale" content="es_EC">
+        <meta property="og:title" content="Neon Stack: reto diario">
+        <meta property="og:description" content="Una torre nueva cada día, igual para todos. Un toque, gratis, sin registro. ¿Superas mi puntaje?">
+        <meta property="og:url" content="https://games.johnandrestrujillo.com/play/neon-stack">
+        <meta property="og:image" content="https://jatezzz.github.io/neon-stack/og.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta name="twitter:card" content="summary_large_image">
+        <style>
+            html, body {
+                width: 100%; height: 100%;
+                margin: 0; padding: 0;
+                overflow: hidden;
+                background: #05060f;
+                color: #b0b0c0;
+                font: 13px Arial, sans-serif;
+            }
+            body {
+                touch-action: none;
+                -webkit-user-select: none; user-select: none;
+                -webkit-touch-callout: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+            #stage {
+                position: relative;
+                margin: 0 auto;
+                padding-top: env(safe-area-inset-top);
+                line-height: 0;
+            }
+            #gameCanvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }
+            body[data-state="title"] #gameCanvas, body[data-state="over"] #gameCanvas, body[data-state="paused"] #gameCanvas { cursor: pointer; }
+            /* Pause button on the corner of the game: the phone's "Esc". Only while a run is on or paused. */
+            #pauseBtn {
+                display: none;
+                position: absolute; top: 6px; right: 6px;
+                width: 40px; height: 40px;
+                border-radius: 8px;
+                border: 2px solid rgba(255, 255, 255, 0.55);
+                background: rgba(0, 0, 0, 0.45);
+                color: #ffffff;
+                font: bold 14px Arial, sans-serif; line-height: 1;
+                touch-action: none;
+                cursor: pointer;
+            }
+            #pauseBtn::before { content: '\275A\275A'; }
+            body[data-state="paused"] #pauseBtn::before { content: '\25B6'; }
+            body[data-state="play"] #pauseBtn, body[data-state="serve"] #pauseBtn, body[data-state="paused"] #pauseBtn { display: block; }
+            body.in-portal #pauseBtn { display: none !important; }      /* the portal has its own pause button */
+            #info {
+                max-width: 520px;
+                margin: 0 auto;
+                padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+                box-sizing: border-box;
+                text-align: center;
+                line-height: 1.4;
+            }
+            #info p { margin: 2px 0; }
+            #info a { color: #00f0ff; }
+            .touch-only { display: none; }
+            body.touch .touch-only { display: block; }
+            body.touch .desktop-only { display: none; }
+            body.touch #howto { display: none; }
+
+            /* Game-over screen: result, share button and one recommended game. */
+            #gameover {
+                position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+                z-index: 20;
+                display: flex; justify-content: center; align-items: center;
+                padding: 12px;
+                box-sizing: border-box;
+                background: rgba(0, 0, 0, 0.72);
+                overflow-y: auto;
+                touch-action: pan-y;
+                line-height: normal;
+            }
+            #gameover[hidden] { display: none; }
+            #gameover .card {
+                width: 100%; max-width: 340px;
+                margin: auto;
+                padding: 16px;
+                box-sizing: border-box;
+                border: 2px solid #00f0ff;
+                border-radius: 14px;
+                background: #05060f;
+                box-shadow: 0 0 18px rgba(0, 240, 255, 0.45);
+                color: #ffffff;
+                text-align: center;
+                font-family: Arial, sans-serif;
+            }
+            #gameover h2 { margin: 0 0 4px; font-size: 16px; font-weight: normal; color: #00f0ff; }
+            #goScore { margin: 0; font-size: 46px; font-weight: bold; line-height: 1.1; }
+            #goScore + small { color: #b0b0c0; }
+            #goOutcome { margin: 6px 0 0; font-size: 24px; font-weight: bold; }
+            #goJoke { margin: 2px 0 8px; font-size: 14px; color: #e8e8f0; font-style: italic; }
+            #gameover.outcome-win .card { border-color: #00ff9c; box-shadow: 0 0 22px rgba(0, 255, 156, 0.55); }
+            #gameover.outcome-win #goOutcome { color: #00ff9c; }
+            #gameover.outcome-tie .card { border-color: #ffdc3c; box-shadow: 0 0 22px rgba(255, 220, 60, 0.5); }
+            #gameover.outcome-tie #goOutcome { color: #ffdc3c; }
+            #gameover.outcome-lose .card { border-color: #ff00c8; box-shadow: 0 0 22px rgba(255, 0, 200, 0.5); }
+            #gameover.outcome-lose #goOutcome { color: #ff00c8; }
+            #goMeta, #goBest { margin: 6px 0; font-size: 13px; color: #b0b0c0; }
+            #goRow { margin: 6px 0; font-size: 20px; letter-spacing: 2px; }
+            #gameover button, #gameover a.button {
+                display: block; width: 100%;
+                margin: 8px 0 0; padding: 12px;
+                box-sizing: border-box;
+                border-radius: 10px;
+                border: 2px solid #00f0ff;
+                background: rgba(0, 240, 255, 0.10);
+                color: #00f0ff;
+                font: bold 16px Arial, sans-serif;
+                text-decoration: none;
+                cursor: pointer;
+            }
+            #gameover button.primary {
+                border-color: #ff00c8;
+                background: #ff00c8;
+                color: #05060f;
+                box-shadow: 0 0 14px rgba(255, 0, 200, 0.6);
+                font-size: 18px;
+            }
+            #goText {
+                width: 100%; height: 86px; margin-top: 8px;
+                box-sizing: border-box;
+                border: 1px solid #334; border-radius: 8px;
+                background: #0b0d1a; color: #ffffff;
+                font: 13px Arial, sans-serif;
+                resize: none;
+                -webkit-user-select: text; user-select: text;
+            }
+            #goLinks { margin-top: 12px; padding-top: 10px; border-top: 1px solid #223; }
+            #goLinks small { display: block; color: #b0b0c0; font-size: 12px; }
+            #goRec {
+                display: flex; align-items: center; gap: 10px;
+                margin-top: 6px; padding: 10px;
+                border: 2px solid #00ff9c; border-radius: 10px;
+                background: rgba(0, 255, 156, 0.08);
+                color: #ffffff; text-decoration: none; text-align: left;
+            }
+            #goRecEmoji { font-size: 30px; }
+            #goRecTitle { display: block; font-weight: bold; color: #00ff9c; }
+            #goRecHook { display: block; font-size: 12px; color: #b0b0c0; }
+            #goMore { display: block; margin-top: 10px; font-size: 13px; color: #00f0ff; }
+        </style>
+    </head>
+    <body>
+        <div id="stage">
+            <canvas id="gameCanvas" width="400" height="640"></canvas>
+            <button type="button" id="pauseBtn" aria-label="Pausa"></button>
+        </div>
+        <div id="info">
+            <p id="howto" class="desktop-only" data-i18n="info.desktop">Toca, haz clic o pulsa Espacio para soltar el bloque.</p>
+            <p><a id="todayLink" href="#" hidden data-i18n="info.today">jugar la torre de hoy</a><span id="todaySep" hidden> | </span><a id="muteLink" href="#" data-i18n="info.mute">silenciar</a> |
+                <a id="portalLink" href="https://games.johnandrestrujillo.com/play" data-i18n="info.portal">más juegos</a> |
+                <a href="https://github.com/jatezzz/neon-stack" data-i18n="info.source">código en GitHub</a></p>
+        </div>
+        <div id="gameover" hidden role="dialog" aria-modal="true" aria-labelledby="goTitle">
+            <div class="card">
+                <h2 id="goTitle"></h2>
+                <p id="goOutcome" hidden></p>
+                <p id="goJoke" hidden></p>
+                <p id="goScore"></p><small data-i18n="over.points">puntos</small>
+                <div><p id="goRow"></p><p id="goMeta"></p></div>
+                <p id="goBest"></p>
+                <div class="actions">
+                    <button type="button" id="goShare" class="primary" data-i18n="over.share">Compartir resultado</button>
+                    <button type="button" id="goAgain" data-i18n="over.again">Jugar de nuevo</button>
+                </div>
+                <div id="goFallback" hidden>
+                    <textarea id="goText" readonly aria-label="Resultado"></textarea>
+                    <a id="goWhatsapp" class="button" target="_blank" rel="noopener" data-i18n="over.whatsapp">Enviar por WhatsApp</a>
+                    <button type="button" id="goCopy" data-i18n="over.copy">Copiar texto</button>
+                </div>
+                <div id="goLinks">
+                    <small data-i18n="over.try">Prueba también</small>
+                    <a id="goRec" target="_top">
+                        <span id="goRecEmoji"></span>
+                        <span><span id="goRecTitle"></span><span id="goRecHook"></span></span>
+                    </a>
+                    <a id="goMore" target="_top"></a>
+                </div>
+            </div>
+        </div>
+
+        <script src="js/i18n.js?v=20261122a"></script>
+        <script src="js/daily.js?v=20261122a"></script>
+        <script src="js/stack.js?v=20261122a"></script>
+        <script>
+        (function () {
+            'use strict';
+            NeonI18n.apply();
+            document.getElementById('portalLink').href = NeonDaily.withUtm(NeonDaily.CONFIG.portal + '/play', 'game', 'footer');
+            NeonDaily.trackArrival();
+            if (NeonDaily.sharedDay) {          // playing a shared tower of another day: offer today's
+                document.getElementById('todayLink').hidden = false;
+                document.getElementById('todaySep').hidden = false;
+            }
+            document.getElementById('todayLink').addEventListener('click', function (e) { e.preventDefault(); NeonDaily.playToday(); });
+
+            var touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+            if (touch) { document.body.classList.add('touch'); }
+            if (NeonDaily.embedded && window.PortalSDK) { document.body.classList.add('in-portal'); }
+
+            var stage = document.getElementById('stage'), canvas = document.getElementById('gameCanvas');
+            var info = document.getElementById('info');
+
+            //  The game is 400 x 640: as large as the screen allows, leaving room for the links under it.
+            function fit() {
+                var reserve = info.offsetHeight + 4;
+                var w = Math.min(window.innerWidth, (window.innerHeight - reserve) * 400 / 640, 560);
+                stage.style.width = Math.floor(w) + 'px';
+            }
+            fit();
+
+            var game = new NeonStack.Game(canvas);
+            game.touch = touch;
+            window.game = game;
+            game.start();
+            window.addEventListener('resize', function () { fit(); game.resize(); });
+
+            //  Keyboard.
+            window.addEventListener('keydown', function (e) {
+                var k = e.keyCode;
+                if (k === 37 || k === 39 || k === 32 || k === 38 || k === 40) { e.preventDefault(); }
+                if (e.repeat && (k === 32 || k === 27 || k === 80)) { return; }
+                game.keyDown(k);
+            });
+            window.addEventListener('keyup', function (e) { game.keyUp(e.keyCode); });
+
+            //  Pointer: a tap or a click anywhere (but on links and the cards) starts, drops or resumes.
+            function ignored(target) { return target.closest && target.closest('#gameover, #info a, #pauseBtn'); }
+            window.addEventListener('pointerdown', function (e) {
+                if (ignored(e.target)) { return; }
+                if (e.pointerType === 'mouse' && e.button !== 0) { return; }
+                game.action();
+            });
+
+            //  Pause: the corner button, and by itself when the page goes to the background.
+            var pauseBtn = document.getElementById('pauseBtn');
+            pauseBtn.setAttribute('aria-label', NeonI18n.t('pad.pause'));
+            pauseBtn.addEventListener('pointerdown', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                game.requestPause(!game.paused);
+            });
+            document.addEventListener('visibilitychange', function () { if (document.hidden) { game.requestPause(true); } });
+
+            //  Sound.
+            var muteLink = document.getElementById('muteLink');
+            function muteText() { muteLink.textContent = NeonI18n.t(game.sound.mute ? 'info.unmute' : 'info.mute'); }
+            muteText();
+            muteLink.addEventListener('click', function (e) { e.preventDefault(); game.sound.toggle(); muteText(); });
+        })();
+        </script>
+    </body>
+</html>

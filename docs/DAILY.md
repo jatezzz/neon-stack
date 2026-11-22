@@ -1,0 +1,36 @@
+# Tower of the day, sharing and measurement
+
+Neon Stack has one challenge per day, the same for everyone. The daily module (`js/daily.js`) is the one Neon Raiders
+and Neon Bricks use; their `docs/DAILY.md` describes sharing, links and the anonymous counters in full.
+
+## The tower
+
+- The day is the player's local calendar date. Challenge #1 is `firstDay` in `js/daily.js` (2026-11-22).
+- `NeonStack.dayPlan()` draws, from the date (`NeonDaily.rng('tower')`), for every floor: its speed (it rises with the
+  height, ±12 % from the day), the side the block comes from, and whether it is a **golden block** (from floor 5,
+  about one in eleven; it moves 25 % faster and is worth double). It also picks the tower's colours.
+- The physics runs at a fixed 120 steps per second, so the same taps give the same tower on any device.
+
+## Points
+
+| What | Points |
+|---|---|
+| A floor | 10 (golden: 20) |
+| A perfect drop (4 px or closer) | +5 × the perfect streak, up to +30 |
+
+From the fourth perfect drop in a row the block grows back 10 px, up to the first block's width.
+
+## A score to beat
+
+`...?d=2026-11-22&vs=785&by=bot` shows the goal on the title screen and in the score line. A score in a link is
+*declared*; it is *verified* only when it matches a run in `VERIFIED` (`js/daily.js`).
+
+Today the verified score is the auto-player's **785 on tower #1** (2026-11-22, 45 floors): `tests/autoplayer.js` with
+40 ms of timing error, the best of five seeds (785, 685, 595, 415 and 415). It decides once per physics step, so the run
+plays the same in fast-forward and in real time.
+
+## Progress and measurement
+
+Kept in the browser only: `ns.day`, `ns.streak`, `ns.shared`, `ns.days`, `ns.lang`, `ns.mute`. Counters go to the
+portal (`/e`) with `g=neon-stack`; in `over`, `w` is the floor reached, `k` the perfect drops, `c` the longest perfect
+streak and `p` the golden blocks placed.

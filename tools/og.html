@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#05060f}</style></head>
+<body><canvas id="c" width="1200" height="630"></canvas>
+<script>
+// The link-preview image (og.png, 1200x630): a tower of neon blocks, the name and the promise.
+var c = document.getElementById('c'), x = c.getContext('2d');
+var g = x.createLinearGradient(0, 0, 0, 630); g.addColorStop(0, '#05060f'); g.addColorStop(1, '#1a0b33');
+x.fillStyle = g; x.fillRect(0, 0, 1200, 630);
+x.strokeStyle = 'rgba(177,77,255,0.18)';
+for (var i = 0; i <= 1200; i += 60) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 630); x.stroke(); }
+for (i = 0; i <= 630; i += 60) { x.beginPath(); x.moveTo(0, i); x.lineTo(1200, i); x.stroke(); }
+var cx = 880, w = 300, y = 560, hue = 190;
+x.save(); x.shadowColor = '#00f0ff'; x.shadowBlur = 14; x.fillStyle = '#00f0ff'; x.fillRect(cx - w / 2 - 20, y, w + 40, 4); x.restore();
+var widths = [300, 300, 286, 286, 270, 270, 270, 252, 240, 240, 226, 226, 210, 196, 196, 180, 168];
+var shift = [0, 0, -7, -7, 4, 4, 4, -5, 2, 2, -6, -6, 3, -4, -4, 5, 0];
+for (var k = 0; k < widths.length; k++) {
+  var bw = widths[k], bx = cx - bw / 2 + shift[k], by = y - (k + 1) * 30;
+  var col = k === 9 ? '#ffd23c' : 'hsl(' + ((hue + k * 11) % 360) + ',100%,62%)';
+  x.save(); x.shadowColor = col; x.shadowBlur = 16; x.fillStyle = col; x.fillRect(bx, by + 2, bw, 26); x.restore();
+  x.fillStyle = 'rgba(255,255,255,0.35)'; x.fillRect(bx + 5, by + 5, bw - 10, 4);
+}
+x.save(); x.shadowColor = '#ff00c8'; x.shadowBlur = 20; x.fillStyle = '#ff00c8'; x.fillRect(cx + 40, y - 18 * 30 - 6, 168, 26); x.restore();
+function txt(t, yy, size, color) { x.save(); x.font = 'bold ' + size + 'px Arial, sans-serif'; x.shadowColor = color; x.shadowBlur = 18; x.fillStyle = color; x.fillText(t, 60, yy); x.restore(); }
+txt('NEON', 200, 120, '#ff00c8'); txt('STACK', 320, 120, '#00f0ff');
+txt('Una torre nueva cada día,', 420, 40, '#ffffff'); txt('igual para todos. Un toque.', 472, 40, '#ffffff');
+txt('¿Superas mi puntaje?', 560, 34, '#ffdc3c');
+</script></body></html>
