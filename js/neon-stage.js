@@ -62,7 +62,7 @@
         '@media (prefers-reduced-motion:no-preference) and (min-width:900px){#nsBg{animation:nsDrift 40s ease-in-out infinite alternate}}' +
         '@keyframes nsDrift{from{transform:scale(1.04)}to{transform:scale(1.14) translateY(-14px)}}' +
         '#nsPulse{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:40;opacity:0}' +
-        '#info{text-shadow:0 1px 2px #05060f,0 0 10px #05060f,0 0 18px #05060f}' +
+        '#info{color:#c8cce0;text-shadow:0 1px 2px #05060f,0 0 10px #05060f,0 0 18px #05060f}#info p{color:#c8cce0}' +
         '#gameCanvas{box-shadow:0 0 0 1px rgba(0,240,255,.35),0 0 26px rgba(255,0,200,.3),0 0 70px rgba(0,240,255,.14)}';
 
     var pulseEl = null, lastPulse = 0, lastStrength = 0;
