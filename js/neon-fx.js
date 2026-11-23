@@ -64,6 +64,7 @@
 
     function celebrate(kind, onCard) {
         if (KINDS.indexOf(kind) < 0) { return; }
+        if (window.NeonStage) { window.NeonStage.stinger(kind); }          // the universe's ending jingle (neon-stage.js)
         var box = host(onCard);
         if (!box) { return; }
         playing = Date.now();

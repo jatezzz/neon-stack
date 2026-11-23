@@ -106,6 +106,7 @@
         var e = { ev: name, at: Date.now(), t: Math.round(this.time * 1000) / 1000, score: this.score };
         if (extra) { for (var k in extra) { e[k] = extra[k]; } }
         this.events.push(e);
+        if (window.NeonStage) { window.NeonStage.event(name, e); }      // the shared universe reacts (neon-stage.js)
         if (this.events.length > 4000) { this.events.shift(); }
     };
 
