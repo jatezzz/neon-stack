@@ -280,6 +280,118 @@
         mute.parentNode.insertBefore(a, mute.nextSibling.nextSibling);
     }
 
+    // ------------------------------------------------------------------------------------------------ text
+    //  Every word on the canvas reads on any part of the stage: big words in airbrush chrome with depth (the game's
+    //  logo, rendered in Blender, on the title), the rest with a thick dark outline, the call to action on a plate.
+    //  NeonStage.text.audit = [] makes every text record its contrast (tests): fill against outline or plate.
+
+    var LOGO = new Image(), logoReady = false;
+    LOGO.onload = function () { logoReady = true; };
+    LOGO.src = BASE + (CFG.logo || 'img/logo.png?v=1');
+
+    var probe = null;
+    function rgb(color) {
+        try {
+            if (!probe) { probe = document.createElement('canvas').getContext('2d'); }
+            probe.fillStyle = '#000'; probe.fillStyle = color;
+            var v = probe.fillStyle;
+            if (v.charAt(0) === '#') { return [parseInt(v.substr(1, 2), 16), parseInt(v.substr(3, 2), 16), parseInt(v.substr(5, 2), 16)]; }
+            var m = v.match(/[\d.]+/g); return [+m[0], +m[1], +m[2]];
+        } catch (err) { return [255, 255, 255]; }
+    }
+    function lum(c) {
+        var f = function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+    }
+    function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+    function record(kind, text, size, fill, against) {
+        if (!TX.audit) { return; }
+        TX.audit.push({ kind: kind, text: String(text).slice(0, 40), size: size, ratio: Math.round(ratio(rgb(fill), against) * 10) / 10 });
+    }
+    var INK = [5, 6, 15];
+
+    //  Text with a dark outline around every glyph, in the context's current font, colour and alignment.
+    function outlined(ctx, text, x, y, maxW) {
+        var m = /(\d+(?:\.\d+)?)px/.exec(ctx.font), px = m ? +m[1] : 14;
+        ctx.save();
+        var blur = ctx.shadowBlur, shadow = ctx.shadowColor;
+        ctx.shadowBlur = 0; ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+        ctx.lineWidth = Math.max(3, px * 0.24); ctx.strokeStyle = 'rgba(5,6,15,0.95)';
+        if (maxW) { ctx.strokeText(text, x, y, maxW); } else { ctx.strokeText(text, x, y); }
+        ctx.shadowBlur = blur; ctx.shadowColor = shadow;
+        if (maxW) { ctx.fillText(text, x, y, maxW); } else { ctx.fillText(text, x, y); }
+        record('outline', text, px, ctx.fillStyle, INK);
+        ctx.restore();
+    }
+
+    //  Big words: airbrush chrome with depth, the rim in the word's colour.
+    function chrome(ctx, text, x, y, size, rim) {
+        ctx.save();
+        ctx.font = '900 ' + size + 'px "Arial Black", "Arial Bold", Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+        var depth = Math.max(3, Math.round(size * 0.12)), top = y - size * 0.42, bottom = y + size * 0.4;
+        for (var i = depth; i > 0; i--) {
+            ctx.fillStyle = i === depth ? '#14001f' : (i > depth / 2 ? '#3d0058' : rim);
+            ctx.fillText(text, x + i * 0.5, y + i);
+        }
+        ctx.lineWidth = Math.max(3, size * 0.08); ctx.strokeStyle = '#05060f'; ctx.strokeText(text, x, y);
+        var g = ctx.createLinearGradient(0, top, 0, bottom);
+        g.addColorStop(0, '#e9f9ff'); g.addColorStop(0.42, '#7fd8ff'); g.addColorStop(0.49, '#ffffff'); g.addColorStop(0.52, '#ffffff');
+        g.addColorStop(0.56, '#2b1f5e'); g.addColorStop(0.8, '#c04dd8'); g.addColorStop(1, '#ffd6f5');
+        ctx.fillStyle = g; ctx.fillText(text, x, y);
+        ctx.shadowColor = rim; ctx.shadowBlur = size * 0.3; ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.strokeText(text, x, y);
+        record('chrome', text, size, '#7fd8ff', INK);         // the darkest light part of the face, against the outline
+        ctx.restore();
+    }
+
+    //  The call to action: white on a dark glass plate with a neon edge that breathes.
+    function plate(ctx, text, x, y, size, color, glow) {
+        ctx.save();
+        ctx.font = 'bold ' + size + 'px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        var w = ctx.measureText(text).width + size * 1.6, h = size * 2;
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(5,6,15,0.82)';
+        ctx.beginPath();
+        if (ctx.roundRect) { ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); } else { ctx.rect(x - w / 2, y - h / 2, w, h); }
+        ctx.fill();
+        var against = INK;
+        if (TX.audit) {
+            try {                                             // measure the plate as drawn, over whatever stage is behind it
+                var tr = ctx.getTransform(), px = ctx.getImageData(Math.round(tr.a * (x - w / 2 + h / 2) + tr.e), Math.round(tr.d * (y - 2) + tr.f), Math.max(1, Math.round(tr.a * (w - h))), 4).data;
+                var sum = [0, 0, 0], n = px.length / 4;
+                for (var i = 0; i < px.length; i += 4) { sum[0] += px[i]; sum[1] += px[i + 1]; sum[2] += px[i + 2]; }
+                against = [sum[0] / n, sum[1] / n, sum[2] / n];
+            } catch (err) { /* tainted canvas: keep the ink */ }
+        }
+        ctx.shadowColor = '#00f0ff'; ctx.shadowBlur = 6 + 10 * (glow === undefined ? 1 : glow);
+        ctx.strokeStyle = 'rgba(0,240,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.shadowBlur = 0; ctx.fillStyle = color || '#ffffff'; ctx.fillText(text, x, y + 1);
+        record('plate', text, size, color || '#ffffff', against);
+        ctx.restore();
+    }
+
+    //  A centred line: chrome when it is big, outlined otherwise (the games' own center() calls this).
+    function center(ctx, text, x, y, size, color, glow) {
+        if (size >= 30) { chrome(ctx, text, x, y, size, color); return; }
+        ctx.save();
+        ctx.font = 'bold ' + size + 'px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
+        ctx.fillStyle = color; outlined(ctx, text, x, y);
+        ctx.restore();
+    }
+
+    //  The game's 3D logo centred at (x, y), w wide. False until it has loaded (draw the chrome words instead).
+    function logo(ctx, x, y, w) {
+        if (!logoReady) { return false; }
+        var h = w * LOGO.height / LOGO.width;
+        ctx.save(); ctx.shadowColor = 'rgba(255,0,200,0.55)'; ctx.shadowBlur = 18;
+        ctx.drawImage(LOGO, x - w / 2, y - h / 2, w, h); ctx.restore();
+        record('logo', 'logo', w, '#e9f9ff', INK);
+        return true;
+    }
+
+    var TX = { outlined: outlined, chrome: chrome, plate: plate, center: center, logo: logo, audit: null, ratio: ratio };
+
     // ------------------------------------------------------------------------------------------------ reactions
 
     function intensity(v) { level = Math.max(0, Math.min(1, v)); }
@@ -358,6 +470,6 @@
 
     window.NeonStage = { event: safe(event), pulse: safe(pulse), intensity: safe(intensity), stinger: safe(stinger),
                          sfx: function (n) { try { return sfx(n); } catch (err) { return false; } },
-                         render: render, flavour: FL, game: GAME,
+                         render: render, flavour: FL, game: GAME, text: TX,
                          state: function () { return { mode: mode, level: level, looping: !!sched, audio: A ? A.state : 'none', music: musicOn }; } };
 })();
