@@ -63,9 +63,38 @@
         '@keyframes nsDrift{from{transform:scale(1.04)}to{transform:scale(1.14) translateY(-14px)}}' +
         '#nsPulse{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:40;opacity:0}' +
         '#info{color:#c8cce0;text-shadow:0 1px 2px #05060f,0 0 10px #05060f,0 0 18px #05060f}#info p{color:#c8cce0}' +
-        '#gameCanvas{box-shadow:0 0 0 1px rgba(0,240,255,.35),0 0 26px rgba(255,0,200,.3),0 0 70px rgba(0,240,255,.14)}';
+        '#gameCanvas{box-shadow:0 0 0 1px rgba(0,240,255,.35),0 0 26px rgba(255,0,200,.3),0 0 70px rgba(0,240,255,.14)}' +
+        //  The result card: dark glass in a magenta-to-cyan neon frame (green for a win, gold for a tie), a chrome score,
+        //  neon buttons; it swings in in 3D.
+        'body #gameover{background:rgba(5,6,15,.6);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}' +
+        'body #gameover .card{--a:#ff00c8;--b:#00f0ff;border:2px solid transparent;border-radius:18px;' +
+        'background:linear-gradient(180deg,rgba(26,10,52,.96),rgba(5,6,15,.97)) padding-box,linear-gradient(135deg,var(--a),var(--b)) border-box;' +
+        'box-shadow:0 0 26px color-mix(in srgb,var(--a) 45%,transparent),0 0 60px color-mix(in srgb,var(--b) 25%,transparent)}' +
+        'body #gameover.outcome-win .card{--a:#00ff9c;--b:#00f0ff}body #gameover.outcome-tie .card{--a:#ffdc3c;--b:#ff00c8}' +
+        'body #gameover.outcome-lose .card{--a:#ff00c8;--b:#b14dff}' +
+        'body #goScore{background:linear-gradient(180deg,#ffffff 0%,#bff1ff 45%,#ffffff 52%,#ffd0f4 100%);-webkit-background-clip:text;background-clip:text;' +
+        'color:transparent;filter:drop-shadow(0 2px 0 #3d0058) drop-shadow(0 0 10px rgba(0,240,255,.45))}' +
+        'body #gameover h2{color:#7ff6ff;letter-spacing:.5px}' +
+        'body #gameover button,body #gameover a.button{border-radius:12px;background:rgba(0,240,255,.08);box-shadow:inset 0 0 12px rgba(0,240,255,.18)}' +
+        'body #gameover button.primary{background:linear-gradient(180deg,#ff5ad9,#ff00c8 55%,#f50ac4);color:#05060f;border-color:#ff9be9;' +
+        'box-shadow:0 0 18px rgba(255,0,200,.6),inset 0 1px 0 rgba(255,255,255,.6)}' +
+        'body #goLinks{border-top-color:rgba(0,240,255,.25)}' +
+        '@media (prefers-reduced-motion:no-preference){body #gameover:not([hidden]) .card{animation:nsCardIn .55s cubic-bezier(.2,.9,.25,1.15) both}}' +
+        '@keyframes nsCardIn{from{opacity:0;transform:perspective(800px) rotateX(32deg) translateY(36px) scale(.9)}to{opacity:1;transform:none}}' +
+        //  The sweep between screens: a band of light runs down the whole window.
+        '#nsSweep{position:fixed;left:0;right:0;top:-30%;height:30%;pointer-events:none;z-index:41;opacity:0;' +
+        'background:linear-gradient(180deg,rgba(255,0,200,0),rgba(255,0,200,.35) 40%,rgba(255,255,255,.75) 50%,rgba(0,240,255,.35) 60%,rgba(0,240,255,0))}' +
+        '#nsSweep.go{animation:nsSweep .5s ease-in both}' +
+        '@keyframes nsSweep{0%{opacity:1;transform:translateY(0)}100%{opacity:.2;transform:translateY(470%)}}';
 
-    var pulseEl = null, lastPulse = 0, lastStrength = 0;
+    var pulseEl = null, sweepEl = null, lastPulse = 0, lastStrength = 0;
+
+    //  Between screens (title or result -> a run): a band of light sweeps the window, with a pulse.
+    function sweep() {
+        if (!sweepEl || calm) { return; }
+        sweepEl.classList.remove('go'); void sweepEl.offsetWidth; sweepEl.classList.add('go');
+        pulse('cyan', 0.5);
+    }
 
     function setupPage() {
         var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
@@ -75,6 +104,8 @@
         document.body.style.background = 'transparent';          // the html keeps the dark colour underneath
         pulseEl = document.createElement('div'); pulseEl.id = 'nsPulse'; pulseEl.setAttribute('aria-hidden', 'true');
         document.body.appendChild(pulseEl);
+        sweepEl = document.createElement('div'); sweepEl.id = 'nsSweep'; sweepEl.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(sweepEl);
         musicLink();
     }
 
@@ -251,9 +282,13 @@
         else { g.setTargetAtTime(0.26, t, 0.3); f.setTargetAtTime(700, t, 0.2); }
     }
 
+    var lastRaw = '';
+    var ENTRY = CFG.entry || ['title', 'WelcomeState', 'over', 'GameOverState'];
     function stateChanged() {
         var s = document.body.getAttribute('data-state') || '';
         var m = OVER.indexOf(s) >= 0 ? 'over' : (PLAY.indexOf(s) >= 0 ? 'play' : 'quiet');
+        if (s !== lastRaw && PLAY.indexOf(s) >= 0 && ENTRY.indexOf(lastRaw) >= 0) { sweep(); }
+        lastRaw = s;
         if (m === mode) { return; }
         if (mode === 'over' && m !== 'over') { level = 0.35; }       // a new run starts calm
         mode = m; apply();
@@ -381,16 +416,55 @@
     }
 
     //  The game's 3D logo centred at (x, y), w wide. False until it has loaded (draw the chrome words instead).
+    //  The logo moves in 3D: a light sweeps across the chrome every few seconds, and it sways gently in perspective.
+    var shine = null;
     function logo(ctx, x, y, w) {
         if (!logoReady) { return false; }
-        var h = w * LOGO.height / LOGO.width;
-        ctx.save(); ctx.shadowColor = 'rgba(255,0,200,0.55)'; ctx.shadowBlur = 18;
-        ctx.drawImage(LOGO, x - w / 2, y - h / 2, w, h); ctx.restore();
+        var h = w * LOGO.height / LOGO.width, t = Date.now() / 1000;
+        var img = LOGO;
+        if (!calm) {
+            try {
+                if (!shine) { shine = document.createElement('canvas'); shine.width = Math.min(800, LOGO.width); shine.height = Math.round(shine.width * LOGO.height / LOGO.width); }
+                var c = shine.getContext('2d'), sw = shine.width, sh = shine.height, k = (t % 3.4) / 0.9;   // a sweep lasts 0.9 s of every 3.4 s
+                c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, sw, sh); c.drawImage(LOGO, 0, 0, sw, sh);
+                if (k < 1) {
+                    var bx = -sw * 0.3 + k * sw * 1.6, g = c.createLinearGradient(bx - sw * 0.12, 0, bx + sw * 0.12, sh);
+                    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.85)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+                    c.globalCompositeOperation = 'source-atop'; c.fillStyle = g; c.fillRect(0, 0, sw, sh);
+                }
+                img = shine;
+            } catch (err) { img = LOGO; }
+        }
+        ctx.save();
+        ctx.translate(x, y);
+        if (!calm) {                                          // a slow sway: it tips back and forth, as if hung in space
+            var sway = Math.sin(t * 1.3);
+            ctx.transform(1, 0, sway * 0.04, 1 - Math.abs(sway) * 0.03, 0, 0);
+            ctx.translate(0, Math.sin(t * 1.9) * 2);
+        }
+        ctx.shadowColor = 'rgba(255,0,200,0.55)'; ctx.shadowBlur = 18;
+        ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore();
         record('logo', 'logo', w, '#e9f9ff', INK);
         return true;
     }
 
-    var TX = { outlined: outlined, chrome: chrome, plate: plate, center: center, logo: logo, audit: null, ratio: ratio };
+    //  The cover art (img/cover.jpg) as the title screen's backdrop, top-aligned so the logo sits in its sky, dimmed.
+    var COVER = new Image(), coverReady = false;
+    COVER.onload = function () { coverReady = true; };
+    COVER.src = BASE + (CFG.cover || 'img/cover.jpg?v=1');
+    function cover(ctx, x, y, w, h, dim) {
+        if (!coverReady) { return false; }
+        var s = Math.max(w / COVER.width, h / COVER.height), dw = COVER.width * s, dh = COVER.height * s;
+        ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        ctx.drawImage(COVER, x + (w - dw) / 2, y, dw, dh);
+        var g = ctx.createLinearGradient(0, y, 0, y + h);
+        g.addColorStop(0, 'rgba(5,6,15,' + (dim * 0.6) + ')'); g.addColorStop(0.45, 'rgba(5,6,15,' + dim + ')'); g.addColorStop(1, 'rgba(5,6,15,' + Math.min(0.9, dim + 0.15) + ')');
+        ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+        ctx.restore();
+        return true;
+    }
+
+    var TX = { outlined: outlined, chrome: chrome, plate: plate, center: center, logo: logo, cover: cover, audit: null, ratio: ratio };
 
     // ------------------------------------------------------------------------------------------------ reactions
 
@@ -470,6 +544,6 @@
 
     window.NeonStage = { event: safe(event), pulse: safe(pulse), intensity: safe(intensity), stinger: safe(stinger),
                          sfx: function (n) { try { return sfx(n); } catch (err) { return false; } },
-                         render: render, flavour: FL, game: GAME, text: TX,
+                         render: render, flavour: FL, game: GAME, text: TX, cover: function () { return cover.apply(null, arguments); }, sweep: safe(function () { sweep(); }),
                          state: function () { return { mode: mode, level: level, looping: !!sched, audio: A ? A.state : 'none', music: musicOn }; } };
 })();

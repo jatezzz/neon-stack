@@ -502,7 +502,10 @@
     };
 
     Game.prototype.drawTitle = function (ctx) {
-        ctx.fillStyle = 'rgba(5,6,15,0.55)'; ctx.fillRect(0, TOP, W, H - TOP);
+        //  The cover art behind the title (img/cover.jpg), dimmed; the plain dark veil until it loads.
+        if (!(window.NeonStage && window.NeonStage.cover(ctx, 0, TOP, W, H - TOP, 0.5))) {
+            ctx.fillStyle = 'rgba(5,6,15,0.55)'; ctx.fillRect(0, TOP, W, H - TOP);
+        }
         //  The game's 3D logo (Blender, img/logo.png); the chrome words until it loads.
         if (!(window.NeonStage && window.NeonStage.text && window.NeonStage.text.logo(ctx, W / 2, 190, 320))) {
             this.center(ctx, 'NEON', 170, 54, '#ff00c8', true);
