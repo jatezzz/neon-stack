@@ -209,8 +209,10 @@
             NeonI18n.apply();
             document.getElementById('portalLink').href = NeonDaily.withUtm(NeonDaily.CONFIG.portal + '/play', 'game', 'footer');
             if (NeonDaily.hosted) {             // hosted by another portal: keep only mute and music in the footer
-                document.getElementById('portalLink').parentNode.innerHTML = document.getElementById('portalLink').parentNode.innerHTML
-                    .replace(/\s*\|\s*<a id="portalLink"[\s\S]*$/, '');
+                var pl = document.getElementById('portalLink'), before = pl.previousSibling;   // remove nodes, keep the listeners
+                if (before && before.nodeType === 3) { before.textContent = before.textContent.replace(/\s*\|\s*$/, ''); }
+                while (pl.nextSibling) { pl.parentNode.removeChild(pl.nextSibling); }
+                pl.parentNode.removeChild(pl);
                 document.body.classList.add('hosted');
             }
             NeonDaily.trackArrival();

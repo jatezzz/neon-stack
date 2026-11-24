@@ -37,6 +37,18 @@
     var hosted = String(window.NEON_HOST || '');
     var debug = /[?&]debug=true\b/.test(window.location.search);
 
+    //  Hosted: in-page actions (mute, music, today's challenge) stay actions but are not links (some portals forbid <a href>).
+    function unlink() {
+        [].forEach.call(document.querySelectorAll('a[href="#"]'), function (a) {
+            a.removeAttribute('href'); a.setAttribute('role', 'button'); a.tabIndex = 0; a.style.cursor = 'pointer';
+            a.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); a.click(); } });
+        });
+    }
+    if (hosted) {
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', unlink); } else { unlink(); }
+        new MutationObserver(unlink).observe(document.documentElement, { childList: true, subtree: true });
+    }
+
     // ---------------------------------------------------------------- dates and random numbers
 
     function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -251,6 +263,7 @@
         box.hidden = false;
         el('goText').value = text;
         el('goWhatsapp').href = 'https://wa.me/?text=' + encodeURIComponent(text);
+        if (hosted) { el('goWhatsapp').remove(); }    // a hosting portal: no way out of the game
     }
 
     function share() {
@@ -326,13 +339,15 @@
 
         //  Inside the portal the page around the game already lists the other games.
         var rec = recommended(), links = el('goLinks');
-        links.hidden = (embedded && onPortal) || !!hosted;
-        el('goRec').href = withUtm(CONFIG.portal + '/play/' + rec.id, 'game', 'gameover');
-        el('goRecEmoji').textContent = rec.emoji;
-        el('goRecTitle').textContent = rec.title;
-        el('goRecHook').textContent = I.t('rec.' + rec.id);
-        el('goMore').href = withUtm(CONFIG.portal + '/play', 'game', 'gameover-more');
-        el('goMore').textContent = I.t('over.more', { host: CONFIG.portalHost });
+        if (links) { links.hidden = (embedded && onPortal) || !!hosted; }
+        if (hosted) { if (links) { links.remove(); } } else {   // a hosting portal: no links to other games or sites
+            el('goRec').href = withUtm(CONFIG.portal + '/play/' + rec.id, 'game', 'gameover');
+            el('goRecEmoji').textContent = rec.emoji;
+            el('goRecTitle').textContent = rec.title;
+            el('goRecHook').textContent = I.t('rec.' + rec.id);
+            el('goMore').href = withUtm(CONFIG.portal + '/play', 'game', 'gameover-more');
+            el('goMore').textContent = I.t('over.more', { host: CONFIG.portalHost });
+        }
 
         shownAt = Date.now();
         overlay.hidden = false;
