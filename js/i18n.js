@@ -194,8 +194,9 @@
             var saved = window.localStorage.getItem('ns.lang');
             if (saved === 'es' || saved === 'en') { return saved; }
         } catch (err) { if (forced) { return forced; } }
+        //  Spanish for Spanish browsers, English for everyone else (as Neon Command does; portals ask for English by default).
         var nav = (navigator.language || 'es').toLowerCase();
-        return nav.indexOf('en') === 0 ? 'en' : 'es';
+        return nav.indexOf('es') === 0 ? 'es' : 'en';
     }
 
     var lang = pickLang();
