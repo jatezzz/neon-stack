@@ -208,6 +208,11 @@
             'use strict';
             NeonI18n.apply();
             document.getElementById('portalLink').href = NeonDaily.withUtm(NeonDaily.CONFIG.portal + '/play', 'game', 'footer');
+            if (NeonDaily.hosted) {             // hosted by another portal: keep only mute and music in the footer
+                document.getElementById('portalLink').parentNode.innerHTML = document.getElementById('portalLink').parentNode.innerHTML
+                    .replace(/\s*\|\s*<a id="portalLink"[\s\S]*$/, '');
+                document.body.classList.add('hosted');
+            }
             NeonDaily.trackArrival();
             if (NeonDaily.sharedDay) {          // playing a shared tower of another day: offer today's
                 document.getElementById('todayLink').hidden = false;

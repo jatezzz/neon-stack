@@ -33,6 +33,8 @@
     var embedded = false;
     try { embedded = window.self !== window.top; } catch (err) { embedded = true; }
     var onPortal = window.location.hostname === CONFIG.portalHost;
+    //  Another portal hosts this copy (window.NEON_HOST, set by its build, e.g. 'crazygames'): no links out, no own counters.
+    var hosted = String(window.NEON_HOST || '');
     var debug = /[?&]debug=true\b/.test(window.location.search);
 
     // ---------------------------------------------------------------- dates and random numbers
@@ -206,6 +208,7 @@
     // ---------------------------------------------------------------- anonymous events
 
     function trackingAllowed() {
+        if (hosted) { return false; }
         if (navigator.doNotTrack === '1' || window.doNotTrack === '1') { return false; }
         var h = window.location.hostname;
         return window.location.protocol === 'https:' && h !== 'localhost' && h !== '127.0.0.1';
@@ -252,7 +255,7 @@
 
     function share() {
         if (!lastShare || Date.now() - shownAt < CONFIG.buttonsDelayMs) { return; }
-        var text = lastShare.text + '\n' + lastShare.url;
+        var text = hosted ? lastShare.text : lastShare.text + '\n' + lastShare.url;
         track('share_tap', {});
         if (navigator.share) {
             navigator.share({ text: text }).then(function () { track('share', { how: 'native' }); })
@@ -323,7 +326,7 @@
 
         //  Inside the portal the page around the game already lists the other games.
         var rec = recommended(), links = el('goLinks');
-        links.hidden = embedded && onPortal;
+        links.hidden = (embedded && onPortal) || !!hosted;
         el('goRec').href = withUtm(CONFIG.portal + '/play/' + rec.id, 'game', 'gameover');
         el('goRecEmoji').textContent = rec.emoji;
         el('goRecTitle').textContent = rec.title;
@@ -373,6 +376,6 @@
         shareText: shareText, shareUrl: shareUrl, shareMessage: shareMessage, withUtm: withUtm, wallRow: wallRow,
         track: track, trackArrival: trackArrival, sent: sent,
         onRunStart: onRunStart, onGameOver: onGameOver, hideOverlay: hideOverlay, locked: locked,
-        embedded: embedded, onPortal: onPortal
+        embedded: embedded, onPortal: onPortal, hosted: hosted
     };
 })();
